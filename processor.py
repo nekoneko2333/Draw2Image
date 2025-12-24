@@ -808,9 +808,11 @@ class ClassicNSTProcessor:
     遵循 README 与 Guide.md 的黄金法则，针对 4090 显卡进行深度优化。
     """
     def __init__(self):
+        # 获取当前文件所在目录作为项目根目录
+        self.project_root = os.path.dirname(os.path.abspath(__file__))
         # 核心：使用改进版的 INetwork.py 以获得更高的艺术质量
-        self.nst_path = "/root/autodl-tmp/Neural-Style-Transfer/INetwork.py"
-        self.assets_root = "/root/autodl-tmp/assets/styles"
+        self.nst_path = os.path.join(self.project_root, "Neural-Style-Transfer", "INetwork.py")
+        self.assets_root = os.path.join(self.project_root, "assets", "styles")
         self._assets_structure = self._scan_assets_directory()
         logger.info("🎨 经典 NST 精修引擎已挂载 (4090 深度优化版)")
 
@@ -886,9 +888,9 @@ class ClassicNSTProcessor:
         # 1. 动态确定风格参考图路径
         ref_image_name = kwargs.get('ref_image_name')
         if ref_image_name:
-            style_path = f"/root/autodl-tmp/assets/styles/{style}/{ref_image_name}"
+            style_path = os.path.join(self.assets_root, style, ref_image_name)
         else:
-            style_path = f"/root/autodl-tmp/assets/styles/{style}.jpg"
+            style_path = os.path.join(self.assets_root, f"{style}.jpg")
         
         # 高质量保存内容图，避免 JPEG 压缩会引入噪声
         cv2.imwrite(content_path, image, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
@@ -944,7 +946,7 @@ class ClassicNSTProcessor:
         
         try:
             custom_env = os.environ.copy()
-            custom_env["PYTHONPATH"] = "/root/autodl-tmp/Neural-Style-Transfer"
+            custom_env["PYTHONPATH"] = os.path.join(self.project_root, "Neural-Style-Transfer")
             custom_env["CUDA_VISIBLE_DEVICES"] = "0"
             # 关键：限制 TensorFlow 显存分配策略，不贪婪占用
             custom_env["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
