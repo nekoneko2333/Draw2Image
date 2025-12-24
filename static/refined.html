@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>大师精修版 | Classic NST Refinement</title>
+    
+    <!-- 极简字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==================== 基础重置 ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #fafafa;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-muted: #999999;
+            --border-light: #e5e5e5;
+            --accent: #7c3aed;
+            --accent-light: #ede9fe;
+            --accent-dark: #6d28d9;
+            --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.05);
+            --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --radius-pill: 50px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* ==================== 侧边导航栏 ==================== */
+        .nav-bar {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            z-index: 1000;
+        }
+
+        .nav-link {
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* ==================== 头部导航 ==================== */
+        .header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent), #ec4899);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            font-weight: 600;
+            font-size: 18px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--accent-light);
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--accent);
+        }
+
+        /* ==================== 主体布局 ==================== */
+        .main-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px;
+            gap: 40px;
+        }
+
+        /* 卡片通用样式 */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            overflow: visible;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title-icon {
+            font-size: 18px;
+        }
+
+        .card-body {
+            padding: 24px;
+            position: relative;
+        }
+
+        /* ==================== 画布区域 ==================== */
+        .canvas-wrapper {
+            position: relative;
+            width: 512px;
+            height: 512px;
+            background: white;
+            border-radius: var(--radius-md);
+            border: 2px dashed var(--border-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .canvas-wrapper:hover {
+            border-color: var(--accent);
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        /* 画布水印提示 */
+        .canvas-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-muted);
+            pointer-events: none;
+            transition: var(--transition);
+        }
+
+        .canvas-hint.hidden {
+            opacity: 0;
+        }
+
+        .canvas-hint-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .canvas-hint-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 浮动工具栏 */
+        .floating-toolbar {
+            position: absolute;
+            left: -60px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+        }
+
+        .tool-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .tool-btn.active {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .tool-divider {
+            height: 1px;
+            background: var(--border-light);
+            margin: 4px 0;
+        }
+
+        /* 取色器 */
+        .color-picker-wrapper {
+            position: relative;
+            width: 40px;
+            height: 40px;
+        }
+
+        .color-picker-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .color-preview {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--border-light);
+            background: #000000;
+            transition: var(--transition);
+        }
+
+        .color-picker-input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+        }
+
+        /* 快捷颜色 */
+        .quick-colors {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 4px 0;
+        }
+
+        .quick-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+            margin: 0 auto;
+        }
+
+        .quick-color:hover {
+            transform: scale(1.2);
+            border-color: var(--accent);
+        }
+
+        .quick-color.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-light);
+        }
+
+        /* 画笔大小滑块 */
+        .brush-size-wrapper {
+            padding: 8px;
+        }
+
+        .brush-size-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .brush-size-slider {
+            width: 24px;
+            height: 100px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border-light);
+            border-radius: 12px;
+            outline: none;
+            writing-mode: vertical-lr;
+            direction: rtl;
+        }
+
+        .brush-size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .brush-size-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* ==================== 结果展示区 ==================== */
+        .result-wrapper {
+            position: relative;
+            width: 512px;
+            height: 512px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .result-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: var(--transition);
+        }
+
+        .result-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .result-placeholder-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .result-placeholder-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* ==================== Loading 动画 ==================== */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border-light);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .loading-subtext {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .loading-progress {
+            width: 200px;
+            height: 6px;
+            background: var(--border-light);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #ec4899);
+            border-radius: 3px;
+            animation: progress 3s ease-in-out infinite;
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 80%; }
+            100% { width: 100%; }
+        }
+
+        /* ==================== 风格选择器 ==================== */
+        .style-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .style-pill {
+            padding: 10px 20px;
+            border: none;
+            background: var(--bg-primary);
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .style-pill:hover {
+            background: var(--border-light);
+            color: var(--text-primary);
+        }
+
+        .style-pill.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .style-pill-icon {
+            font-size: 16px;
+        }
+
+        /* ==================== 参考图缩略图容器 ==================== */
+        .ref-container {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 12px 0;
+            min-height: 60px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .ref-container:empty::before {
+            content: '点击上方风格查看素材库';
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .ref-thumb {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--radius-sm);
+            border: 2px solid transparent;
+            cursor: pointer;
+            object-fit: cover;
+            transition: var(--transition);
+            background: var(--bg-primary);
+        }
+
+        .ref-thumb:hover {
+            border-color: var(--accent);
+            transform: scale(1.08);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .ref-thumb.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        /* ==================== 高级选项面板 ==================== */
+        .advanced-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.05), rgba(236, 72, 153, 0.05));
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+        }
+
+        .option-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .option-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* 开关样式 */
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border-light);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(135deg, var(--accent), #ec4899);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: var(--transition);
+        }
+
+        .toggle-switch.active::after {
+            left: 22px;
+        }
+
+        /* 下拉框样式 */
+        .option-select {
+            padding: 8px 32px 8px 12px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            background: white;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: var(--transition);
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+
+        .option-select:hover {
+            border-color: var(--accent);
+        }
+
+        .option-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        .option-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            max-width: 120px;
+        }
+
+        /* ==================== 渲染按钮 ==================== */
+        .render-btn {
+            padding: 16px 48px;
+            border: none;
+            background: linear-gradient(135deg, var(--accent), #ec4899);
+            border-radius: var(--radius-pill);
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 auto;
+        }
+
+        .render-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(124, 58, 237, 0.5);
+        }
+
+        .render-btn:active {
+            transform: translateY(0);
+        }
+
+        .render-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .render-btn-icon {
+            font-size: 20px;
+        }
+
+        /* ==================== 操作栏 ==================== */
+        .action-bar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border-light);
+            background: white;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .action-btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .action-btn.primary:hover {
+            background: var(--accent-dark);
+        }
+
+        /* ==================== 底部操作区 ==================== */
+        .prompt-section {
+            padding: 24px 40px;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-light);
+        }
+
+        .prompt-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* ==================== 通知提示 ==================== */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 24px;
+            background: var(--text-primary);
+            color: white;
+            border-radius: var(--radius-pill);
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow-card);
+            transition: var(--transition);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ==================== 响应式设计 ==================== */
+        @media (max-width: 1200px) {
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+                padding: 20px;
+                gap: 20px;
+            }
+
+            .canvas-wrapper,
+            .result-wrapper {
+                width: 100%;
+                max-width: 500px;
+                height: auto;
+                aspect-ratio: 1;
+            }
+
+            .floating-toolbar {
+                position: fixed;
+                left: 10px;
+                top: 50%;
+                z-index: 100;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                padding: 16px 20px;
+            }
+
+            .logo-text {
+                display: none;
+            }
+
+            .prompt-section {
+                padding: 16px 20px;
+            }
+
+            .render-btn {
+                padding: 14px 32px;
+                font-size: 14px;
+            }
+
+            .floating-toolbar {
+                left: 5px;
+                padding: 8px;
+            }
+
+            .brush-size-slider {
+                height: 60px;
+            }
+
+            .brush-size-wrapper {
+                padding: 4px;
+            }
+
+            .brush-size-label {
+                font-size: 9px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边导航栏 -->
+    <nav class="nav-bar">
+        <a href="index.html" class="nav-link" title="实时创作版">
+            ⚡ 实时版
+        </a>
+        <a href="refined.html" class="nav-link active" title="大师精修版">
+            🎨 精修版
+        </a>
+    </nav>
+
+    <!-- 头部导航 -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">🖼️</div>
+            <div>
+                <span class="logo-text">Feature Space Optimizer</span>
+                <div class="logo-subtitle">基于 VGG16 conv5_2 层的内容重建与 Gram 矩阵映射</div>
+            </div>
+        </div>
+        <div class="status-badge">
+            <span>🎭 高精度</span>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main-container">
+        <!-- 左侧：内容图画板 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">📝</span>
+                    内容图（草图/照片）
+                </div>
+                <div class="action-bar">
+                    <button class="action-btn" id="clearBtn">
+                        🗑️ 清空
+                    </button>
+                    <button class="action-btn" id="uploadBtn">
+                        📷 上传照片
+                    </button>
+                    <input type="file" id="photoInput" accept="image/*" style="display: none;">
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 浮动工具栏 -->
+                <div class="floating-toolbar">
+                    <button class="tool-btn active" id="brushTool" data-tooltip="画笔">🖌️</button>
+                    <button class="tool-btn" id="eraserTool" data-tooltip="橡皮擦">🧽</button>
+                    <div class="tool-divider"></div>
+                    <div class="color-picker-wrapper" data-tooltip="颜色">
+                        <div class="color-picker-btn">
+                            <div class="color-preview" id="colorPreview"></div>
+                            <input type="color" class="color-picker-input" id="colorPicker" value="#000000">
+                        </div>
+                    </div>
+                    <div class="quick-colors">
+                        <div class="quick-color active" data-color="#000000" style="background: #000000;" title="黑色"></div>
+                        <div class="quick-color" data-color="#ef4444" style="background: #ef4444;" title="红色"></div>
+                        <div class="quick-color" data-color="#3b82f6" style="background: #3b82f6;" title="蓝色"></div>
+                        <div class="quick-color" data-color="#22c55e" style="background: #22c55e;" title="绿色"></div>
+                        <div class="quick-color" data-color="#f59e0b" style="background: #f59e0b;" title="橙色"></div>
+                    </div>
+                    <div class="tool-divider"></div>
+                    <div class="brush-size-wrapper">
+                        <div class="brush-size-label" id="brushSizeLabel">4px</div>
+                        <input type="range" class="brush-size-slider" id="brushSize" min="1" max="20" value="4">
+                    </div>
+                </div>
+
+                <div class="canvas-wrapper" id="canvasWrapper">
+                    <canvas id="sketchCanvas" width="512" height="512"></canvas>
+                    <div class="canvas-hint" id="canvasHint">
+                        <div class="canvas-hint-icon">🖼️</div>
+                        <div class="canvas-hint-text">绘制草图或上传照片</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：精修结果 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">✨</span>
+                    精修结果
+                </div>
+                <div class="action-bar">
+                    <button class="action-btn primary" id="downloadBtn">
+                        💾 保存
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="result-wrapper" id="resultWrapper">
+                    <div class="result-placeholder" id="resultPlaceholder">
+                        <div class="result-placeholder-icon">🎨</div>
+                        <div class="result-placeholder-text">点击下方按钮开始精修渲染</div>
+                    </div>
+                    <img id="resultImage" style="display: none;" alt="精修结果">
+                    
+                    <!-- Loading 遮罩层 -->
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="loading-spinner"></div>
+                        <div class="loading-text">
+                            🎨 AI 正在进行像素级精修
+                            <div class="loading-subtext">经典神经风格迁移，请耐心等待约 30-60 秒...</div>
+                        </div>
+                        <div class="loading-progress">
+                            <div class="loading-progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 风格选择 + 渲染按钮 -->
+    <section class="prompt-section">
+        <div class="prompt-container">
+            <!-- 风格选择器 -->
+            <div class="style-selector" id="styleSelector" style="margin-bottom: 16px;">
+                <span style="color: var(--text-muted); font-size: 13px;">正在加载风格库...</span>
+            </div>
+
+            <!-- 参考图缩略图容器 -->
+            <div class="ref-container" id="refContainer"></div>
+
+            <!-- 高级渲染选项 -->
+            <div class="advanced-options">
+                <!-- 颜色保留开关 -->
+                <div class="option-group">
+                    <span class="option-label">🎨 颜色保留</span>
+                    <div class="toggle-switch" id="preserveColorToggle" title="保持原图色彩，仅迁移纹理"></div>
+                    <span class="option-hint">保持原图色彩</span>
+                </div>
+                
+                <!-- 渲染模式选择 -->
+                <div class="option-group">
+                    <span class="option-label">✨ 渲染模式</span>
+                    <select class="option-select" id="poolTypeSelect">
+                        <option value="max">锐利 (Max Pooling)</option>
+                        <option value="ave">柔和 (Avg Pooling)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 渲染按钮 -->
+            <div style="text-align: center; margin-top: 24px;">
+                <button class="render-btn" id="renderBtn" disabled>
+                    <span class="render-btn-icon">🚀</span>
+                    开始精修渲染
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 通知提示 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== DOM 元素引用 ====================
+        const sketchCanvas = document.getElementById('sketchCanvas');
+        const ctx = sketchCanvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const canvasHint = document.getElementById('canvasHint');
+        const resultWrapper = document.getElementById('resultWrapper');
+        const resultImage = document.getElementById('resultImage');
+        const resultPlaceholder = document.getElementById('resultPlaceholder');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const renderBtn = document.getElementById('renderBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const photoInput = document.getElementById('photoInput');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const styleSelector = document.getElementById('styleSelector');
+        const refContainer = document.getElementById('refContainer');
+        const toast = document.getElementById('toast');
+        const brushTool = document.getElementById('brushTool');
+        const eraserTool = document.getElementById('eraserTool');
+        const colorPicker = document.getElementById('colorPicker');
+        const colorPreview = document.getElementById('colorPreview');
+        const brushSizeSlider = document.getElementById('brushSize');
+        const brushSizeLabel = document.getElementById('brushSizeLabel');
+        const preserveColorToggle = document.getElementById('preserveColorToggle');
+        const poolTypeSelect = document.getElementById('poolTypeSelect');
+
+        // ==================== 状态变量 ====================
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentStyle = '';
+        let hasContent = false;
+        let isRendering = false;
+        let brushSize = 4;
+        let brushColor = '#000000';
+        let isEraser = false;
+        let originalImageData = null;  // 存储原图用于传给后端
+        let preserveColor = false;  // 颜色保留开关状态
+        
+        // 风格素材库相关
+        let assetsData = {};
+        let assetsBaseUrl = '/assets';
+        let currentRefImage = null;
+
+        // 风格图标映射
+        const styleIcons = {
+            'vangogh': '🌻', 'monet': '🌸', 'watercolor': '💧',
+            'oil': '🖼️', 'sculpture': '🗿', 'cyberpunk': '🌃',
+            'anime': '🎌', 'sketch': '✏️', 'ink': '🖤',
+            'default': '🎨'
+        };
+        
+        // 风格显示名称映射
+        const styleNames = {
+            'vangogh': '梵高', 'monet': '莫奈', 'watercolor': '水彩',
+            'oil': '古典油画', 'sculpture': '浮雕雕塑', 'cyberpunk': '赛博朋克',
+            'anime': '动漫', 'sketch': '素描', 'ink': '水墨'
+        };
+
+        // ==================== 初始化画布 ====================
+        function initCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sketchCanvas.width, sketchCanvas.height);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
+
+        // ==================== 风格素材库加载 ====================
+        async function loadAssetsStructure() {
+            try {
+                const pathParts = window.location.pathname.split('/');
+                const proxyIndex = pathParts.indexOf('proxy');
+                const proxyBase = proxyIndex !== -1 
+                    ? pathParts.slice(0, proxyIndex + 2).join('/') 
+                    : '';
+                
+                const apiUrl = `${window.location.origin}${proxyBase}/api/assets`;
+                console.log('📦 正在加载素材库:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                assetsData = data.assets || {};
+                assetsBaseUrl = proxyBase + (data.base_url || '/assets');
+                
+                const styleNames_list = Object.keys(assetsData);
+                console.log('✅ 素材库加载成功:', styleNames_list.length, '个风格');
+                
+                renderStyleButtons(styleNames_list);
+                
+                if (styleNames_list.length > 0 && !currentStyle) {
+                    currentStyle = styleNames_list[0];
+                    const firstBtn = styleSelector.querySelector('.style-pill');
+                    if (firstBtn) firstBtn.classList.add('active');
+                }
+                
+                renderRefThumbnails(currentStyle);
+                
+            } catch (error) {
+                console.error('❌ 素材库加载失败:', error);
+                styleSelector.innerHTML = '<span style="color: #ef4444;">⚠️ 风格库加载失败，请刷新重试</span>';
+            }
+        }
+        
+        function renderStyleButtons(styles) {
+            styleSelector.innerHTML = '';
+            
+            if (styles.length === 0) {
+                styleSelector.innerHTML = '<span style="color: var(--text-muted);">暂无可用风格</span>';
+                return;
+            }
+            
+            styles.forEach((styleName, index) => {
+                const btn = document.createElement('button');
+                const hasAssets = assetsData[styleName] && assetsData[styleName].length > 0;
+                
+                btn.className = 'style-pill' + (index === 0 ? ' active' : '');
+                btn.dataset.style = styleName;
+                
+                const icon = styleIcons[styleName] || styleIcons['default'];
+                const displayName = styleNames[styleName] || styleName;
+                
+                btn.innerHTML = `<span class="style-pill-icon">${icon}</span> ${displayName}`;
+                btn.title = hasAssets ? `${displayName} (${assetsData[styleName].length} 张素材)` : `${displayName} (无素材)`;
+                
+                btn.addEventListener('click', () => {
+                    styleSelector.querySelectorAll('.style-pill').forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentStyle = styleName;
+                    renderRefThumbnails(currentStyle);
+                    showToast(`🎨 已切换至「${displayName}」风格`);
+                });
+                
+                styleSelector.appendChild(btn);
+            });
+        }
+
+        function renderRefThumbnails(style) {
+            refContainer.innerHTML = '';
+            currentRefImage = null;
+            
+            const files = assetsData[style] || [];
+            
+            if (files.length === 0) {
+                refContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 13px;">该风格暂无素材</div>';
+                return;
+            }
+            
+            files.forEach((filename, index) => {
+                const img = document.createElement('img');
+                img.className = 'ref-thumb' + (index === 0 ? ' active' : '');
+                img.src = `${assetsBaseUrl}/${style}/${filename}`;
+                img.alt = filename;
+                img.title = filename;
+                img.dataset.filename = filename;
+                img.loading = 'lazy';
+                
+                if (index === 0) {
+                    currentRefImage = filename;
+                }
+                
+                img.addEventListener('click', () => {
+                    document.querySelectorAll('.ref-thumb').forEach(t => t.classList.remove('active'));
+                    img.classList.add('active');
+                    currentRefImage = filename;
+                    showToast(`🖼️ 已选择: ${filename}`);
+                });
+                
+                refContainer.appendChild(img);
+            });
+        }
+
+        // ==================== 绘图事件 ====================
+        function getPointerPos(e) {
+            const rect = sketchCanvas.getBoundingClientRect();
+            const scaleX = sketchCanvas.width / rect.width;
+            const scaleY = sketchCanvas.height / rect.height;
+            
+            const clientX = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
+            const clientY = e.clientY || (e.touches && e.touches[0]?.clientY) || 0;
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            
+            // 开始绘制时清除原图数据，使用画布内容
+            originalImageData = null;
+            
+            if (!hasContent) {
+                hasContent = true;
+                canvasHint.classList.add('hidden');
+                renderBtn.disabled = false;
+            }
+
+            const pos = getPointerPos(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+
+            const pos = getPointerPos(e);
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.strokeStyle = isEraser ? '#ffffff' : brushColor;
+            ctx.lineWidth = brushSize;
+            ctx.stroke();
+
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        // ==================== 上传照片 ====================
+        function handlePhotoUpload(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                showToast('⚠️ 请选择有效的图片文件');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    // 显存保护：强制锁死 512 像素，CSS contain 保证视觉全貌
+                    const MAX_INTERNAL_SIDE = 512;
+                    let targetWidth = img.width;
+                    let targetHeight = img.height;
+                    
+                    // 如果长边超过 512，等比例缩小
+                    if (Math.max(targetWidth, targetHeight) > MAX_INTERNAL_SIDE) {
+                        const scale = MAX_INTERNAL_SIDE / Math.max(targetWidth, targetHeight);
+                        targetWidth = Math.floor(targetWidth * scale);
+                        targetHeight = Math.floor(targetHeight * scale);
+                    }
+                    
+                    // 确保宽高为 8 的倍数
+                    targetWidth = Math.floor(targetWidth / 8) * 8 || 8;
+                    targetHeight = Math.floor(targetHeight / 8) * 8 || 8;
+                    
+                    // 设置画布内部像素尺寸（不改变 CSS 显示尺寸）
+                    sketchCanvas.width = targetWidth;
+                    sketchCanvas.height = targetHeight;
+                    
+                    // 清空并绘制图片到画布（铺满逻辑画布）
+                    ctx.clearRect(0, 0, targetWidth, targetHeight);
+                    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                    
+                    // 清除原图数据，使用画布内容
+                    originalImageData = null;
+                    
+                    hasContent = true;
+                    canvasHint.classList.add('hidden');
+                    renderBtn.disabled = false;
+                    
+                    console.log(`📷 画布像素: ${targetWidth}x${targetHeight}`);
+                    showToast(`📷 照片已加载 (${targetWidth}x${targetHeight})`);
+                };
+                img.onerror = () => {
+                    showToast('❌ 图片加载失败');
+                };
+                img.src = e.target.result;
+            };
+            reader.onerror = () => {
+                showToast('⚠️ 文件读取失败');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ==================== 精修渲染 ====================
+        async function startRefinedRender() {
+            if (!hasContent || isRendering) return;
+            
+            isRendering = true;
+            renderBtn.disabled = true;
+            loadingOverlay.classList.add('active');
+            
+            try {
+                // 获取 proxy 路径
+                const pathParts = window.location.pathname.split('/');
+                const proxyIndex = pathParts.indexOf('proxy');
+                const proxyBase = proxyIndex !== -1 
+                    ? pathParts.slice(0, proxyIndex + 2).join('/') 
+                    : '';
+                
+                const apiUrl = `${window.location.origin}${proxyBase}/api/render_refined`;
+                
+                // 获取画布内容（已限制像素尺寸）
+                const imageData = sketchCanvas.toDataURL('image/png');
+                
+                // 获取高级选项
+                const poolType = poolTypeSelect.value;
+                const styleWeight = 0.05;  // 官方推荐默认值
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: imageData,
+                        style: currentStyle,
+                        ref_image_name: currentRefImage,
+                        preserve_color: preserveColor,
+                        pool_type: poolType,
+                        style_weight: styleWeight
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.image) {
+                    resultImage.src = result.image;
+                    resultImage.style.display = 'block';
+                    resultPlaceholder.style.display = 'none';
+                    showToast('✨ 精修渲染完成！');
+                } else {
+                    throw new Error('返回数据无效');
+                }
+                
+            } catch (error) {
+                console.error('精修渲染失败:', error);
+                showToast('❌ 渲染失败：' + error.message);
+            } finally {
+                isRendering = false;
+                renderBtn.disabled = false;
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        // ==================== 清空画布 ====================
+        function clearCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sketchCanvas.width, sketchCanvas.height);
+            hasContent = false;
+            originalImageData = null;  // 清除原图数据
+            canvasHint.classList.remove('hidden');
+            renderBtn.disabled = true;
+            resultImage.style.display = 'none';
+            resultPlaceholder.style.display = 'block';
+            showToast('🗑️ 画布已清空');
+        }
+
+        // ==================== 下载功能 ====================
+        function downloadImage() {
+            if (!resultImage.src || resultImage.style.display === 'none') {
+                showToast('⚠️ 暂无图像可保存');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = `refined-nst-${Date.now()}.png`;
+            link.href = resultImage.src;
+            link.click();
+            showToast('💾 图像已保存');
+        }
+
+        // ==================== 通知提示 ====================
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        // ==================== 事件绑定 ====================
+        sketchCanvas.addEventListener('pointerdown', startDrawing);
+        sketchCanvas.addEventListener('pointermove', draw);
+        sketchCanvas.addEventListener('pointerup', stopDrawing);
+        sketchCanvas.addEventListener('pointerleave', stopDrawing);
+        sketchCanvas.addEventListener('pointercancel', stopDrawing);
+
+        // 工具按钮
+        brushTool.addEventListener('click', () => {
+            isEraser = false;
+            brushTool.classList.add('active');
+            eraserTool.classList.remove('active');
+        });
+
+        eraserTool.addEventListener('click', () => {
+            isEraser = true;
+            eraserTool.classList.add('active');
+            brushTool.classList.remove('active');
+        });
+
+        // 取色器
+        colorPicker.addEventListener('input', (e) => {
+            brushColor = e.target.value;
+            colorPreview.style.background = brushColor;
+            // 选择颜色后自动切换到画笔模式
+            isEraser = false;
+            brushTool.classList.add('active');
+            eraserTool.classList.remove('active');
+            // 移除快捷颜色的 active 状态
+            document.querySelectorAll('.quick-color').forEach(c => c.classList.remove('active'));
+        });
+
+        // 快捷颜色
+        document.querySelectorAll('.quick-color').forEach(colorBtn => {
+            colorBtn.addEventListener('click', () => {
+                brushColor = colorBtn.dataset.color;
+                colorPreview.style.background = brushColor;
+                colorPicker.value = brushColor;
+                // 更新 active 状态
+                document.querySelectorAll('.quick-color').forEach(c => c.classList.remove('active'));
+                colorBtn.classList.add('active');
+                // 切换到画笔模式
+                isEraser = false;
+                brushTool.classList.add('active');
+                eraserTool.classList.remove('active');
+            });
+        });
+
+        // 画笔大小
+        brushSizeSlider.addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            brushSizeLabel.textContent = `${brushSize}px`;
+        });
+
+        // 颜色保留开关
+        preserveColorToggle.addEventListener('click', () => {
+            preserveColor = !preserveColor;
+            preserveColorToggle.classList.toggle('active', preserveColor);
+        });
+
+        uploadBtn.addEventListener('click', () => photoInput.click());
+        photoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handlePhotoUpload(file);
+                photoInput.value = '';
+            }
+        });
+
+        clearBtn.addEventListener('click', clearCanvas);
+        downloadBtn.addEventListener('click', downloadImage);
+        renderBtn.addEventListener('click', startRefinedRender);
+
+        // ==================== 初始化 ====================
+        initCanvas();
+        loadAssetsStructure();
+    </script>
+</body>
+</html>

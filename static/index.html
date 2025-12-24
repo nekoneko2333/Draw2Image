@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>实时草图生成 | Sketch to Image</title>
+    
+    <!-- 极简字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==================== 基础重置 ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #fafafa;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-muted: #999999;
+            --border-light: #e5e5e5;
+            --accent: #2563eb;
+            --accent-light: #dbeafe;
+            --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.05);
+            --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --radius-pill: 50px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* ==================== 侧边导航栏 ==================== */
+        .nav-bar {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            z-index: 1000;
+        }
+
+        .nav-link {
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* ==================== 头部导航 ==================== */
+        .header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent), #7c3aed);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            font-weight: 600;
+            font-size: 18px;
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #ecfdf5;
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 500;
+            color: #059669;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+        }
+
+        /* ==================== 主体布局 ==================== */
+        .main-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px;
+            gap: 40px;
+        }
+
+        /* 卡片通用样式 */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            overflow: visible;
+        }
+
+        .card:first-child {
+            margin-left: 60px; /* 为浮动工具栏留出空间 */
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title-icon {
+            font-size: 18px;
+        }
+
+        .card-body {
+            padding: 24px;
+            position: relative;
+        }
+
+        /* ==================== 画布区域 ==================== */
+        .canvas-wrapper {
+            position: relative;
+            width: 512px;
+            height: 512px;
+            background: white;
+            border-radius: var(--radius-md);
+            border: 2px dashed var(--border-light);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .canvas-wrapper:hover {
+            border-color: var(--accent);
+        }
+
+        .canvas-wrapper.drawing {
+            border-style: solid;
+            border-color: var(--accent);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* 画布水印提示 */
+        .canvas-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-muted);
+            pointer-events: none;
+            transition: var(--transition);
+        }
+
+        .canvas-hint.hidden {
+            opacity: 0;
+        }
+
+        .canvas-hint-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .canvas-hint-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 浮动工具栏 */
+        .floating-toolbar {
+            position: absolute;
+            left: -60px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+        }
+
+        .tool-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-btn:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .tool-btn.active {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .tool-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .tool-divider {
+            height: 1px;
+            background: var(--border-light);
+            margin: 4px 0;
+        }
+
+        /* 取色器 */
+        .color-picker-wrapper {
+            position: relative;
+            width: 40px;
+            height: 40px;
+        }
+
+        .color-picker-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .color-preview {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--border-light);
+            background: #000000;
+            transition: var(--transition);
+        }
+
+        .color-picker-input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+        }
+
+        /* 快捷颜色 */
+        .quick-colors {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 4px 0;
+        }
+
+        .quick-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+            margin: 0 auto;
+        }
+
+        .quick-color:hover {
+            transform: scale(1.2);
+            border-color: var(--accent);
+        }
+
+        .quick-color.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-light);
+        }
+
+        /* 画笔大小滑块 */
+        .brush-size-wrapper {
+            padding: 8px;
+        }
+
+        .brush-size-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .brush-size-slider {
+            width: 24px;
+            height: 100px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border-light);
+            border-radius: 12px;
+            outline: none;
+            writing-mode: vertical-lr;
+            direction: rtl;
+        }
+
+        .brush-size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .brush-size-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* ==================== 结果展示区 ==================== */
+        .result-wrapper {
+            position: relative;
+            width: 512px;
+            height: 512px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .result-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: var(--transition);
+        }
+
+        .result-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .result-placeholder-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .result-placeholder-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 处理中呼吸效果 */
+        .result-wrapper.processing {
+            animation: breathe 2s ease-in-out infinite;
+        }
+
+        .result-wrapper.processing::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes breathe {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.2); }
+            50% { box-shadow: 0 0 0 20px rgba(37, 99, 235, 0); }
+        }
+
+        .processing-indicator {
+            position: absolute;
+            z-index: 10;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .result-wrapper.processing .processing-indicator {
+            display: flex;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-light);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .processing-text {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* ==================== 深度图预览区 ==================== */
+        .depth-preview {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 8px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            z-index: 15;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .depth-preview:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .depth-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        .depth-preview img {
+            width: 80px;
+            height: 80px;
+            border-radius: 4px;
+            object-fit: cover;
+            opacity: 0.9;
+        }
+
+        /* ==================== 风格选择器（药丸形状） ==================== */
+        .style-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .style-pill {
+            padding: 10px 20px;
+            border: none;
+            background: var(--bg-primary);
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .style-pill:hover {
+            background: var(--border-light);
+            color: var(--text-primary);
+        }
+
+        .style-pill.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .style-pill-icon {
+            font-size: 16px;
+        }
+
+        /* ==================== 参考图缩略图容器 ==================== */
+        .ref-container {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 12px 0;
+            min-height: 60px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .ref-container:empty::before {
+            content: '点击上方风格查看素材库';
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .ref-thumb {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--radius-sm);
+            border: 2px solid transparent;
+            cursor: pointer;
+            object-fit: cover;
+            transition: var(--transition);
+            background: var(--bg-primary);
+        }
+
+        .ref-thumb:hover {
+            border-color: var(--accent);
+            transform: scale(1.08);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .ref-thumb.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-light);
+        }
+
+        /* 风格加载提示 */
+        .style-loading {
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 10px 20px;
+        }
+
+        /* 动态生成的风格按钮样式增强 */
+        .style-pill.no-assets {
+            opacity: 0.6;
+            position: relative;
+        }
+
+        .style-pill.no-assets::after {
+            content: '?';
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 10px;
+            background: var(--text-muted);
+            color: white;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ref-thumb.loading {
+            animation: thumbPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes thumbPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .ref-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 16px;
+        }
+
+        .ref-loading .spinner {
+            width: 20px;
+            height: 20px;
+            border-width: 2px;
+        }
+
+        /* ==================== 提示词输入（搜索栏风格） ==================== */
+        .prompt-section {
+            padding: 24px 40px;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-light);
+        }
+
+        .prompt-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .prompt-input-wrapper {
+            display: flex;
+            align-items: center;
+            background: var(--bg-primary);
+            border-radius: var(--radius-pill);
+            padding: 4px;
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+
+        .prompt-input-wrapper:focus-within {
+            border-color: var(--accent);
+            background: white;
+        }
+
+        .prompt-icon {
+            padding: 12px 16px;
+            color: var(--text-muted);
+            font-size: 18px;
+        }
+
+        .prompt-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--text-primary);
+            outline: none;
+            padding: 12px 0;
+        }
+
+        .prompt-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .prompt-clear-btn {
+            padding: 8px 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 16px;
+            transition: var(--transition);
+        }
+
+        .prompt-clear-btn:hover {
+            color: var(--text-primary);
+        }
+
+        /* ==================== 底部操作栏 ==================== */
+        .action-bar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border-light);
+            background: white;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .action-btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .action-btn.primary:hover {
+            background: #1d4ed8;
+        }
+
+        /* ==================== 对比模式切换 ==================== */
+        .compare-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-pill);
+        }
+
+        .compare-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border-light);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .toggle-switch.active {
+            background: var(--accent);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: var(--transition);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .toggle-switch.active::after {
+            left: 22px;
+        }
+
+        /* ==================== 响应式设计 ==================== */
+        @media (max-width: 1200px) {
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+                padding: 20px;
+                gap: 20px;
+            }
+
+            .card:first-child {
+                margin-left: 0; /* 移动端不需要额外边距 */
+            }
+
+            .floating-toolbar {
+                position: fixed;
+                left: 10px;
+                top: 50%;
+                z-index: 100;
+            }
+
+            .canvas-wrapper,
+            .result-wrapper {
+                width: 100%;
+                max-width: 512px;
+                height: auto;
+                aspect-ratio: 1 / 1;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header {
+                padding: 16px 20px;
+            }
+
+            .logo-text {
+                display: none;
+            }
+
+            .floating-toolbar {
+                flex-direction: row;
+                left: 50%;
+                top: auto;
+                bottom: 100px;
+                transform: translateX(-50%);
+            }
+
+            .brush-size-slider {
+                writing-mode: horizontal-tb;
+                direction: ltr;
+                width: 80px;
+                height: 24px;
+            }
+
+            .brush-size-wrapper {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .brush-size-label {
+                margin-bottom: 0;
+            }
+
+            .prompt-section {
+                padding: 16px 20px;
+            }
+
+            .style-selector {
+                justify-content: center;
+            }
+
+            .card-header {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .action-bar {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* ==================== 工具提示 ==================== */
+        [data-tooltip] {
+            position: relative;
+        }
+
+        [data-tooltip]::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: calc(100% + 12px);
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 6px 12px;
+            background: var(--text-primary);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            border-radius: var(--radius-sm);
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        [data-tooltip]:hover::before {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* 浮动工具栏需要更高的 z-index */
+        .floating-toolbar {
+            z-index: 500;
+        }
+
+        /* ==================== 通知提示 ==================== */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 24px;
+            background: var(--text-primary);
+            color: white;
+            border-radius: var(--radius-pill);
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow-card);
+            transition: var(--transition);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ==================== 历史记录标签 ==================== */
+        .history-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-pill);
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边导航栏 -->
+    <nav class="nav-bar">
+        <a href="index.html" class="nav-link active" title="实时创作版">
+            ? 实时版
+        </a>
+        <a href="refined.html" class="nav-link" title="大师精修版">
+            ? 精修版
+        </a>
+    </nav>
+
+    <!-- 头部导航 -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">?</div>
+            <span class="logo-text">Sketch to Image</span>
+        </div>
+        <div class="status-badge" id="statusBadge">
+            <div class="status-dot"></div>
+            <span id="statusText">已连接</span>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main-container">
+        <!-- 左侧：草图画板 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">??</span>
+                    草图画板
+                </div>
+                <div class="action-bar">
+                    <button class="action-btn" id="undoBtn" disabled data-tooltip="Ctrl+Z">
+                        ?? 撤销
+                    </button>
+                    <button class="action-btn" id="redoBtn" disabled data-tooltip="Ctrl+Y">
+                        ?? 重做
+                    </button>
+                    <button class="action-btn" id="clearBtn">
+                        ?? 清空
+                    </button>
+                    <button class="action-btn" id="uploadBtn" data-tooltip="上传照片进行风格迁移">
+                        ? 上传照片
+                    </button>
+                    <input type="file" id="photoInput" accept="image/*" style="display: none;">
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 浮动工具栏 -->
+                <div class="floating-toolbar">
+                    <button class="tool-btn active" id="brushTool" data-tooltip="画笔">??</button>
+                    <button class="tool-btn" id="eraserTool" data-tooltip="橡皮擦">?</button>
+                    <div class="tool-divider"></div>
+                    <div class="color-picker-wrapper" data-tooltip="颜色">
+                        <div class="color-picker-btn">
+                            <div class="color-preview" id="colorPreview"></div>
+                            <input type="color" class="color-picker-input" id="colorPicker" value="#000000">
+                        </div>
+                    </div>
+                    <div class="quick-colors">
+                        <div class="quick-color active" data-color="#000000" style="background: #000000;" title="黑色"></div>
+                        <div class="quick-color" data-color="#ef4444" style="background: #ef4444;" title="红色"></div>
+                        <div class="quick-color" data-color="#3b82f6" style="background: #3b82f6;" title="蓝色"></div>
+                        <div class="quick-color" data-color="#22c55e" style="background: #22c55e;" title="绿色"></div>
+                        <div class="quick-color" data-color="#f59e0b" style="background: #f59e0b;" title="橙色"></div>
+                    </div>
+                    <div class="tool-divider"></div>
+                    <div class="brush-size-wrapper">
+                        <div class="brush-size-label" id="brushSizeLabel">4px</div>
+                        <input type="range" class="brush-size-slider" id="brushSize" min="1" max="20" value="4">
+                    </div>
+                </div>
+
+                <div class="canvas-wrapper" id="canvasWrapper">
+                    <canvas id="sketchCanvas" width="512" height="512"></canvas>
+                    <div class="canvas-hint" id="canvasHint">
+                        <div class="canvas-hint-icon">??</div>
+                        <div class="canvas-hint-text">在此处开始绘制草图</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：AI生成结果 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-title-icon">?</span>
+                    AI 生成
+                    <span class="history-badge" id="historyBadge">0 步</span>
+                </div>
+                <div class="action-bar">
+                    <div class="compare-toggle">
+                        <span class="compare-label">对比原稿</span>
+                        <div class="toggle-switch" id="compareToggle"></div>
+                    </div>
+                    <button class="action-btn primary" id="downloadBtn">
+                        ? 保存
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="result-wrapper" id="resultWrapper">
+                    <div class="result-placeholder" id="resultPlaceholder">
+                        <div class="result-placeholder-icon">??</div>
+                        <div class="result-placeholder-text">等待生成...</div>
+                    </div>
+                    <img id="resultImage" style="display: none;" alt="AI生成结果">
+                    <div class="processing-indicator">
+                        <div class="spinner"></div>
+                        <div class="processing-text">AI 正在创作...</div>
+                    </div>
+                </div>
+                <!-- 深度图预览区（照片模式时显示） -->
+                <div class="depth-preview" id="depthPreview" style="display: none;">
+                    <div class="depth-label">? 深度图</div>
+                    <img id="depthImage" alt="深度图预览">
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 风格选择 + 提示词输入 -->
+    <section class="prompt-section">
+        <div class="prompt-container">
+            <!-- 风格选择器（动态生成） -->
+            <div class="style-selector" id="styleSelector" style="margin-bottom: 16px; justify-content: center;">
+                <!-- 风格按钮将由 JS 动态生成 -->
+                <span class="style-loading">正在加载风格库...</span>
+            </div>
+
+            <!-- 参考图缩略图容器 -->
+            <div class="ref-container" id="refContainer"></div>
+
+            <!-- 结构保留强度滑块 -->
+            <div class="strength-slider-wrapper" style="margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 12px;">
+                <span style="font-size: 13px; color: var(--text-secondary);">Structure Strength 结构保留</span>
+                <input type="range" id="style-strength" min="0" max="1" step="0.1" value="0.6" 
+                       style="width: 200px; cursor: pointer;" title="数值越高，越保留原始草图结构">
+                <span id="strengthValue" style="font-size: 13px; color: var(--text-muted); min-width: 36px;">0.6</span>
+            </div>
+
+            <!-- 提示词输入 -->
+            <div class="prompt-input-wrapper">
+                <span class="prompt-icon">?</span>
+                <input type="text" class="prompt-input" id="promptInput" 
+                       placeholder="输入提示词来引导 AI 创作，如：一只可爱的猫咪、梵高风格的星空...">
+                <button class="prompt-clear-btn" id="promptClear">?</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 通知提示 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== DOM 元素引用 ====================
+        const sketchCanvas = document.getElementById('sketchCanvas');
+        const ctx = sketchCanvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const canvasHint = document.getElementById('canvasHint');
+        const resultWrapper = document.getElementById('resultWrapper');
+        const resultImage = document.getElementById('resultImage');
+        const resultPlaceholder = document.getElementById('resultPlaceholder');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const promptInput = document.getElementById('promptInput');
+        const promptClear = document.getElementById('promptClear');
+        const brushSizeSlider = document.getElementById('brushSize');
+        const brushSizeLabel = document.getElementById('brushSizeLabel');
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const compareToggle = document.getElementById('compareToggle');
+        const historyBadge = document.getElementById('historyBadge');
+        const brushTool = document.getElementById('brushTool');
+        const eraserTool = document.getElementById('eraserTool');
+        const colorPicker = document.getElementById('colorPicker');
+        const colorPreview = document.getElementById('colorPreview');
+        const toast = document.getElementById('toast');
+        const refContainer = document.getElementById('refContainer');
+        const styleSelector = document.getElementById('styleSelector');
+
+        // ==================== 状态变量 ====================
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentStyle = '';  // 初始为空，由 API 返回的第一个风格决定
+        let currentPrompt = '';
+        let brushSize = 4;
+        let brushColor = '#000000';
+        let isEraser = false;
+        let historyStack = [];
+        let redoStack = [];
+        let isCompareMode = false;
+        let hasDrawn = false;
+        let socket = null;
+        let pendingRequest = false;
+        let debounceTimer = null;
+        
+        // 风格素材库相关
+        let assetsData = {};        // {风格名: [文件名列表]}
+        let assetsBaseUrl = '/assets';  // 素材基础 URL
+        let currentRefImage = null; // 当前选中的参考图文件名
+        
+        // 照片上传模式
+        let isPhotoMode = false;    // 是否为上传照片模式（需要后端进行边缘提取）
+        
+        // 风格图标映射（用于动态生成按钮）
+        const styleIcons = {
+            'vangogh': '?', 'monet': '?', 'watercolor': '?',
+            'oil': '??', 'sculpture': '?', 'cyberpunk': '?',
+            'anime': '?', 'sketch': '??', 'ink': '?',
+            'default': '?'
+        };
+        
+        // 风格显示名称映射
+        const styleNames = {
+            'vangogh': '梵高', 'monet': '莫奈', 'watercolor': '水彩',
+            'oil': '古典油画', 'sculpture': '浮雕雕塑', 'cyberpunk': '赛博朋克',
+            'anime': '动漫', 'sketch': '素描', 'ink': '水墨'
+        };
+
+        // ==================== 初始化画布 ====================
+        function initCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sketchCanvas.width, sketchCanvas.height);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            saveHistory();
+        }
+
+        // ==================== 风格素材库加载与渲染 ====================
+        async function loadAssetsStructure() {
+            try {
+                // 获取当前路径，处理代理访问
+                const pathParts = window.location.pathname.split('/');
+                const proxyIndex = pathParts.indexOf('proxy');
+                const proxyBase = proxyIndex !== -1 
+                    ? pathParts.slice(0, proxyIndex + 2).join('/') 
+                    : '';
+                
+                const apiUrl = `${window.location.origin}${proxyBase}/api/assets`;
+                console.log('? 正在加载素材库:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                assetsData = data.assets || {};
+                assetsBaseUrl = proxyBase + (data.base_url || '/assets');
+                
+                const styleNames_list = Object.keys(assetsData);
+                console.log('? 素材库加载成功:', styleNames_list.length, '个风格');
+                
+                // 动态生成风格按钮
+                renderStyleButtons(styleNames_list);
+                
+                // 默认选择第一个风格
+                if (styleNames_list.length > 0 && !currentStyle) {
+                    currentStyle = styleNames_list[0];
+                    // 激活第一个按钮
+                    const firstBtn = styleSelector.querySelector('.style-pill');
+                    if (firstBtn) firstBtn.classList.add('active');
+                }
+                
+                // 加载完成后渲染当前风格的缩略图
+                renderRefThumbnails(currentStyle);
+                
+            } catch (error) {
+                console.error('? 素材库加载失败:', error);
+                styleSelector.innerHTML = '<span class="style-loading">?? 风格库加载失败，请刷新重试</span>';
+                refContainer.innerHTML = '';
+            }
+        }
+        
+        function renderStyleButtons(styles) {
+            styleSelector.innerHTML = '';
+            
+            if (styles.length === 0) {
+                styleSelector.innerHTML = '<span class="style-loading">暂无可用风格</span>';
+                return;
+            }
+            
+            styles.forEach((styleName, index) => {
+                const btn = document.createElement('button');
+                const hasAssets = assetsData[styleName] && assetsData[styleName].length > 0;
+                
+                btn.className = 'style-pill' + (index === 0 ? ' active' : '') + (hasAssets ? '' : ' no-assets');
+                btn.dataset.style = styleName;
+                
+                // 获取图标和显示名称
+                const icon = styleIcons[styleName] || styleIcons['default'];
+                const displayName = styleNames[styleName] || styleName;
+                
+                btn.innerHTML = `<span class="style-pill-icon">${icon}</span> ${displayName}`;
+                btn.title = hasAssets ? `${displayName} (${assetsData[styleName].length} 张素材)` : `${displayName} (无素材，仅使用提示词)`;
+                
+                // 绑定点击事件
+                btn.addEventListener('click', () => {
+                    // 移除所有按钮的 active 状态
+                    styleSelector.querySelectorAll('.style-pill').forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    currentStyle = styleName;
+                    isPhotoMode = false; // 切换风格时重置照片模式
+                    
+                    // 渲染该风格的参考图缩略图
+                    renderRefThumbnails(currentStyle);
+                    
+                    // 点击风格后立即发送，实现"一键换画风"
+                    if (hasDrawn) sendToServer();
+                    showToast(`? 已切换至「${displayName}」风格`);
+                });
+                
+                styleSelector.appendChild(btn);
+            });
+            
+            console.log('? 已生成', styles.length, '个风格按钮');
+        }
+
+        function renderRefThumbnails(style) {
+            refContainer.innerHTML = '';
+            currentRefImage = null; // 切换风格时重置参考图选择
+            
+            const files = assetsData[style] || [];
+            
+            if (files.length === 0) {
+                refContainer.innerHTML = '<div class="ref-loading">该风格暂无素材</div>';
+                return;
+            }
+            
+            files.forEach((filename, index) => {
+                const img = document.createElement('img');
+                img.className = 'ref-thumb' + (index === 0 ? ' active' : '');
+                img.src = `${assetsBaseUrl}/${style}/${filename}`;
+                img.alt = filename;
+                img.title = filename;
+                img.dataset.filename = filename;
+                img.loading = 'lazy'; // 懒加载优化
+                
+                // 默认选中第一张
+                if (index === 0) {
+                    currentRefImage = filename;
+                }
+                
+                // 点击选择参考图
+                img.addEventListener('click', () => {
+                    document.querySelectorAll('.ref-thumb').forEach(t => t.classList.remove('active'));
+                    img.classList.add('active');
+                    currentRefImage = filename;
+                    showToast(`?? 已选择: ${filename}`);
+                    
+                    // 如果已经绘制，立即发送更新
+                    if (hasDrawn) sendToServer();
+                });
+                
+                // 加载中状态
+                img.classList.add('loading');
+                img.onload = () => img.classList.remove('loading');
+                img.onerror = () => {
+                    img.classList.remove('loading');
+                    img.style.background = '#fee2e2';
+                    img.title = '加载失败';
+                };
+                
+                refContainer.appendChild(img);
+            });
+        }
+
+        // ==================== WebSocket 连接 ====================
+        function connectWebSocket() {
+            // 获取当前路径，如果是通过 proxy 访问的，需要保留前面的 ID 部分
+            const pathParts = window.location.pathname.split('/');
+            // 找到 proxy 所在的位置，保留到端口号那一段
+            const proxyIndex = pathParts.indexOf('proxy');
+            const proxyBase = proxyIndex !== -1 
+                ? pathParts.slice(0, proxyIndex + 2).join('/') 
+                : '';
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            // 最终生成的 WebSocket 地址会自动带上那串长 ID
+            const wsUrl = `${protocol}//${window.location.host}${proxyBase}/ws`;
+
+            console.log("正在连接 WebSocket 代理地址:", wsUrl);
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                updateStatus(true);
+                showToast('? 连接成功');
+            };
+
+            socket.onclose = () => {
+                updateStatus(false);
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            socket.onerror = () => {
+                updateStatus(false);
+            };
+
+            socket.onmessage = (event) => {
+                pendingRequest = false;
+                resultWrapper.classList.remove('processing');
+                
+                const depthPreview = document.getElementById('depthPreview');
+                const depthImage = document.getElementById('depthImage');
+                
+                // 尝试解析 JSON（新格式：包含结果图和深度图）
+                try {
+                    const jsonData = JSON.parse(event.data);
+                    if (jsonData.type === 'result') {
+                        // 显示结果图
+                        if (jsonData.image) {
+                            resultImage.src = jsonData.image;
+                            resultImage.style.display = 'block';
+                            resultPlaceholder.style.display = 'none';
+                        }
+                        // 显示深度图预览（如果有）
+                        if (jsonData.depth) {
+                            depthImage.src = jsonData.depth;
+                            depthPreview.style.display = 'flex';
+                        } else {
+                            depthPreview.style.display = 'none';
+                        }
+                        return;
+                    }
+                } catch (e) {
+                    // 非 JSON 格式，使用旧逻辑
+                }
+                
+                // 兼容旧格式：直接是 Base64 图像
+                if (event.data.startsWith('data:image')) {
+                    resultImage.src = event.data;
+                    resultImage.style.display = 'block';
+                    resultPlaceholder.style.display = 'none';
+                    depthPreview.style.display = 'none';  // 隐藏深度图预览
+                }
+            };
+        }
+
+        function updateStatus(connected) {
+            if (connected) {
+                statusBadge.style.background = '#ecfdf5';
+                statusBadge.querySelector('.status-dot').style.background = '#10b981';
+                statusText.textContent = '已连接';
+                statusText.style.color = '#059669';
+            } else {
+                statusBadge.style.background = '#fef2f2';
+                statusBadge.querySelector('.status-dot').style.background = '#ef4444';
+                statusText.textContent = '已断开';
+                statusText.style.color = '#dc2626';
+            }
+        }
+
+        // ==================== 发送图像到服务器 ====================
+        function sendToServer() {
+            if (!socket || socket.readyState !== WebSocket.OPEN || pendingRequest) return;
+
+            pendingRequest = true;
+            resultWrapper.classList.add('processing');
+
+            const imageData = sketchCanvas.toDataURL('image/png');
+            const payload = JSON.stringify({
+                image: imageData,
+                style: currentStyle,
+                brush_size: brushSize,
+                prompt: currentPrompt,
+                strength: parseFloat(document.getElementById('style-strength').value),
+                ref_image_name: currentRefImage,  // 参考图文件名
+                is_photo_mode: isPhotoMode,       // 照片模式标志
+                timestamp: Date.now()
+            });
+
+            socket.send(payload);
+            
+            // 发送后重置照片模式标志（后续绘制将使用普通模式）
+            // 注意：保持 isPhotoMode 状态直到用户清空画布或重新绘制
+        }
+
+        function debouncedSend() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(sendToServer, 100);
+        }
+
+        // ==================== 绘图事件处理 ====================
+        function getPointerPos(e) {
+            const rect = sketchCanvas.getBoundingClientRect();
+            const scaleX = sketchCanvas.width / rect.width;
+            const scaleY = sketchCanvas.height / rect.height;
+            
+            const clientX = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
+            const clientY = e.clientY || (e.touches && e.touches[0]?.clientY) || 0;
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            isDrawing = true;
+            canvasWrapper.classList.add('drawing');
+            
+            if (!hasDrawn) {
+                hasDrawn = true;
+                canvasHint.classList.add('hidden');
+            }
+
+            const pos = getPointerPos(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+
+            const pos = getPointerPos(e);
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.strokeStyle = isEraser ? '#ffffff' : brushColor;
+            ctx.lineWidth = brushSize;
+            ctx.stroke();
+
+            lastX = pos.x;
+            lastY = pos.y;
+
+            debouncedSend();
+        }
+
+        function stopDrawing() {
+            if (isDrawing) {
+                isDrawing = false;
+                canvasWrapper.classList.remove('drawing');
+                saveHistory();
+            }
+        }
+
+        // ==================== 历史记录管理 ====================
+        function saveHistory() {
+            const imageData = ctx.getImageData(0, 0, sketchCanvas.width, sketchCanvas.height);
+            historyStack.push(imageData);
+            redoStack = [];
+            updateHistoryButtons();
+        }
+
+        function undo() {
+            if (historyStack.length > 1) {
+                redoStack.push(historyStack.pop());
+                const imageData = historyStack[historyStack.length - 1];
+                ctx.putImageData(imageData, 0, 0);
+                debouncedSend();
+                updateHistoryButtons();
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                const imageData = redoStack.pop();
+                historyStack.push(imageData);
+                ctx.putImageData(imageData, 0, 0);
+                debouncedSend();
+                updateHistoryButtons();
+            }
+        }
+
+        function updateHistoryButtons() {
+            undoBtn.disabled = historyStack.length <= 1;
+            redoBtn.disabled = redoStack.length === 0;
+            historyBadge.textContent = `${historyStack.length - 1} 步`;
+        }
+
+        // ==================== 清空画布 ====================
+        function clearCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sketchCanvas.width, sketchCanvas.height);
+            hasDrawn = false;
+            isPhotoMode = false;  // 重置照片模式
+            canvasHint.classList.remove('hidden');
+            resultImage.style.display = 'none';
+            resultPlaceholder.style.display = 'block';
+            // 隐藏深度图预览
+            document.getElementById('depthPreview').style.display = 'none';
+
+            // 重置宽高比例
+            sketchCanvas.width = 512;
+            sketchCanvas.height = 512;
+            canvasWrapper.style.aspectRatio = '1 / 1';
+            resultWrapper.style.aspectRatio = '1 / 1';
+
+            saveHistory();
+            showToast('?? 画布已清空');
+        }
+
+        // ==================== 上传照片功能 ====================
+        function handlePhotoUpload(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                showToast('?? 请选择有效的图片文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    // 显存保护：强制锁死 512 像素，CSS contain 保证视觉全貌
+                    const MAX_SIDE = 512;
+
+                    // 获取原始宽高
+                    let width = img.width;
+                    let height = img.height;
+
+                    // 限制长边最大为 512，并保持宽高比
+                    if (Math.max(width, height) > MAX_SIDE) {
+                        const scale = MAX_SIDE / Math.max(width, height);
+                        width = Math.floor(width * scale);
+                        height = Math.floor(height * scale);
+                    }
+
+                    // 确保宽高为 8 的倍数
+                    width = Math.floor(width / 8) * 8 || 8;
+                    height = Math.floor(height / 8) * 8 || 8;
+
+                    // 设置画布逻辑像素尺寸（不改变 CSS 显示尺寸）
+                    sketchCanvas.width = width;
+                    sketchCanvas.height = height;
+                    // 不修改 aspectRatio，保持 UI 固定为 512x512
+
+                    // 绘制图片到画布
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 设置状态
+                    hasDrawn = true;
+                    isPhotoMode = true;  // 标记为照片模式
+                    canvasHint.classList.add('hidden');
+
+                    // 保存历史记录
+                    saveHistory();
+
+                    // 立即发送到服务器进行风格迁移
+                    showToast('? 照片已加载，正在生成...');
+                    sendToServer();
+                };
+                img.onerror = () => {
+                    showToast('?? 图片加载失败');
+                };
+                img.src = e.target.result;
+            };
+            reader.onerror = () => {
+                showToast('?? 文件读取失败');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ==================== 对比模式 ====================
+        function toggleCompare() {
+            isCompareMode = !isCompareMode;
+            compareToggle.classList.toggle('active', isCompareMode);
+
+            if (isCompareMode && hasDrawn) {
+                resultImage.src = sketchCanvas.toDataURL('image/png');
+                resultImage.style.display = 'block';
+                resultPlaceholder.style.display = 'none';
+            } else if (!isCompareMode) {
+                debouncedSend();
+            }
+        }
+
+        // ==================== 下载功能 ====================
+        function downloadImage() {
+            if (!resultImage.src || resultImage.style.display === 'none') {
+                showToast('?? 暂无图像可保存');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = `sketch-ai-${Date.now()}.png`;
+            link.href = resultImage.src;
+            link.click();
+            showToast('? 图像已保存');
+        }
+
+        // ==================== 通知提示 ====================
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        // ==================== 事件绑定 ====================
+        // 画布事件
+        sketchCanvas.addEventListener('pointerdown', startDrawing);
+        sketchCanvas.addEventListener('pointermove', draw);
+        sketchCanvas.addEventListener('pointerup', stopDrawing);
+        sketchCanvas.addEventListener('pointerleave', stopDrawing);
+        sketchCanvas.addEventListener('pointercancel', stopDrawing);
+
+        // 工具按钮
+        brushTool.addEventListener('click', () => {
+            isEraser = false;
+            brushTool.classList.add('active');
+            eraserTool.classList.remove('active');
+        });
+
+        eraserTool.addEventListener('click', () => {
+            isEraser = true;
+            isPhotoMode = false;  // 开始绘制时退出照片模式
+            eraserTool.classList.add('active');
+            brushTool.classList.remove('active');
+        });
+
+        // 上传照片按钮
+        const uploadBtn = document.getElementById('uploadBtn');
+        const photoInput = document.getElementById('photoInput');
+        
+        uploadBtn.addEventListener('click', () => {
+            photoInput.click();
+        });
+        
+        photoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handlePhotoUpload(file);
+                // 重置 input 以便可以重复选择同一文件
+                photoInput.value = '';
+            }
+        });
+
+        // 取色器
+        colorPicker.addEventListener('input', (e) => {
+            brushColor = e.target.value;
+            colorPreview.style.background = brushColor;
+            // 选择颜色后自动切换到画笔模式
+            isEraser = false;
+            brushTool.classList.add('active');
+            eraserTool.classList.remove('active');
+            // 移除快捷颜色的 active 状态
+            document.querySelectorAll('.quick-color').forEach(c => c.classList.remove('active'));
+        });
+
+        // 快捷颜色
+        document.querySelectorAll('.quick-color').forEach(colorBtn => {
+            colorBtn.addEventListener('click', () => {
+                brushColor = colorBtn.dataset.color;
+                colorPreview.style.background = brushColor;
+                colorPicker.value = brushColor;
+                // 更新 active 状态
+                document.querySelectorAll('.quick-color').forEach(c => c.classList.remove('active'));
+                colorBtn.classList.add('active');
+                // 切换到画笔模式
+                isEraser = false;
+                brushTool.classList.add('active');
+                eraserTool.classList.remove('active');
+            });
+        });
+
+        // 画笔大小
+        brushSizeSlider.addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            brushSizeLabel.textContent = `${brushSize}px`;
+        });
+
+        // 风格选择事件已在 renderStyleButtons() 中动态绑定
+
+        // 风格强度滑块
+        const strengthSlider = document.getElementById('style-strength');
+        const strengthValue = document.getElementById('strengthValue');
+        strengthSlider.addEventListener('input', (e) => {
+            strengthValue.textContent = e.target.value;
+        });
+        strengthSlider.addEventListener('change', (e) => {
+            // 松开滑块后立即发送
+            if (hasDrawn) sendToServer();
+        });
+
+        // 提示词
+        promptInput.addEventListener('input', (e) => {
+            currentPrompt = e.target.value;
+        });
+
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && hasDrawn) {
+                debouncedSend();
+            }
+        });
+
+        promptClear.addEventListener('click', () => {
+            promptInput.value = '';
+            currentPrompt = '';
+        });
+
+        // 操作按钮
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+        clearBtn.addEventListener('click', clearCanvas);
+        downloadBtn.addEventListener('click', downloadImage);
+        compareToggle.addEventListener('click', toggleCompare);
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                undo();
+            } else if (e.ctrlKey && e.key === 'y') {
+                e.preventDefault();
+                redo();
+            }
+        });
+
+        // ==================== 初始化 ====================
+        initCanvas();
+        connectWebSocket();
+        loadAssetsStructure();  // 加载风格素材库
+    </script>
+</body>
+</html>
