@@ -7,7 +7,7 @@ import tensorflow as tf
 tf.compat.v1.disable_eager_execution()
 
 try:
-    # 优先使用 tf_keras (TensorFlow 2.16+ 推荐)
+    # 优先使用 tf_keras 
     import tf_keras
     from tf_keras.models import Model
     from tf_keras.layers import InputLayer, Conv2D, AveragePooling2D, MaxPooling2D

@@ -1,10 +1,3 @@
-"""
-实时草图转图像系统 - FastAPI 后端 (用户意图增强版)
-
-移除自动语义识别 (BLIP)，完全尊重用户输入的 Prompt。
-保留双 ControlNet 控制和照片模式深度图反馈。
-"""
-
 import os
 import base64
 import json
@@ -13,7 +6,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-# ============== 环境配置 ==============
+# autodl的路径和镜像配置
 os.environ["HF_HOME"] = "/root/autodl-tmp/hf_cache"
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
@@ -22,17 +15,16 @@ logger = logging.getLogger(__name__)
 
 from processor import create_processor, ClassicNSTProcessor
 
-app = FastAPI(title="人机交互艺术创作系统", version="1.2.0")
+app = FastAPI(title="人机交互技术大作业", version="1.2.0")
 
-# 初始化处理器（此时内部 BLIP 已删，但保留了翻译和 IP-Adapter 逻辑）
 processor = create_processor("ai")
 
-# ============== WebSocket 实时通道 ==============
+# WebSocket
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    logger.info("✅ 实时创作通道连接成功")
+    logger.info("实时创作已初始化")
     
     try:
         while True:
@@ -40,20 +32,19 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 data = json.loads(raw_data)
                 
-                # 1. 提取用户输入的参数（保留 Prompt）
+                # 提取用户输入的参数，结构保留程度、prompt等
                 image_base64 = data.get('image', '')
                 style = data.get('style', 'vangogh')
                 prompt = data.get('prompt', '')  # 用户的核心意图
                 strength = float(data.get('strength', 0.6))
                 ref_image_name = data.get('ref_image_name', None)
-                is_photo_mode = data.get('is_photo_mode', False) # 保留照片模式开关
+                is_photo_mode = data.get('is_photo_mode', False) # 是否上传的照片
                 
-                # 2. 图像解码
+                # 图像解码
                 img = processor.decode_base64_image(image_base64)
                 
                 if img is not None and img.size > 0:
-                    # 3. 推理：透传所有用户参数
-                    # 此时 processor.process 内部会处理用户 Prompt 的翻译
+                    # 这个步骤里prompt会被翻译
                     processed_img = processor.process(
                         image=img,
                         style=style,
@@ -63,10 +54,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         is_photo_mode=is_photo_mode
                     )
                     
-                    # 4. 获取结果图
+                    # 获取结果
                     result_base64 = processor.encode_image_to_base64(processed_img)
                     
-                    # 5. 【核心保留】如果处于照片模式，返回深度图预览
+                    # 如果处于照片模式，返回深度图预览
                     depth_base64 = None
                     if is_photo_mode and hasattr(processor, 'get_last_depth_image_base64'):
                         depth_base64 = processor.get_last_depth_image_base64()
@@ -89,7 +80,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"❌ 系统异常: {e}")
 
-# ============== 其他 API (保持不变) ==============
+# 其他API接口
 
 @app.get("/api/assets")
 async def get_assets_structure():
@@ -99,7 +90,7 @@ async def get_assets_structure():
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/assets", StaticFiles(directory="/root/autodl-tmp/assets/styles"), name="assets")
 
-# 精修渲染接口 (NST)
+# NST接口
 nst_processor = None
 @app.post("/api/render_refined")
 async def render_refined(request: dict):
