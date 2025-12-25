@@ -126,6 +126,9 @@ parser.add_argument('--preserve_color', dest='color', default="False", type=str,
 parser.add_argument('--min_improvement', default=0.0, type=float,
                     help='Defines minimum improvement required to continue script')
 
+parser.add_argument('--save_every', default=1, type=int,
+                    help='Save intermediate result every N iterations (0 = only save final result)')
+
 
 def str_to_bool(v):
     return v.lower() in ("true", "yes", "t", "1")
@@ -663,9 +666,17 @@ for i in range(num_iter):
         img = imresize(img, (img_WIDTH, img_HEIGHT), interp=args.rescale_method)
 
     fname = result_prefix + "_at_iteration_%d.png" % (i + 1)
-    imsave(fname, img)
+    
+    # 根据 save_every 参数决定是否保存
+    save_every = args.save_every
+    is_last_iter = (i + 1) == num_iter
+    should_save = is_last_iter or (save_every > 0 and (i + 1) % save_every == 0)
+    
+    if should_save:
+        imsave(fname, img)
+        print("Image saved as", fname)
+    
     end_time = time.time()
-    print("Image saved as", fname)
     print("Iteration %d completed in %ds" % (i + 1, end_time - start_time))
 
     if improvement_threshold != 0.0:
